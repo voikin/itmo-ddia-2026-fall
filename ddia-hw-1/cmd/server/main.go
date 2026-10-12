@@ -12,8 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/internal/api"
 	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/internal/storage"
+	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/pkg/metrics"
 )
 
 func main() {
@@ -36,9 +41,26 @@ func main() {
 }
 
 func run(addr string) error {
+	labels := metrics.LabelsFromEnv()
+	slog.Info("instance labels", "pod", labels.Pod, "datacenter", labels.Datacenter, "deployment", labels.Deployment)
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
+	gs := metrics.New(labels, reg, metrics.WithSkip("/healthz", "/metrics"))
+	metricsHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg})
+
+	router := api.NewRouter(storage.NewMemory(), gs.Middleware, metricsHandler)
+	if err := gs.Init(router); err != nil {
+		return fmt.Errorf("init metrics: %w", err)
+	}
+	slog.Info("instrumented routes", "routes", gs.Routes())
+
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           api.NewRouter(storage.NewMemory()),
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

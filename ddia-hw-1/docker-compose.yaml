@@ -6,17 +6,24 @@ services:
       context: .
       dockerfile: Dockerfile
     image: ddia-hw-1/app:local
-    env_file:
-      - path: .env
-        required: false
     environment:
-      HTTP_ADDR: ${APP_HTTP_ADDR:-:8080}
+      HTTP_ADDR: ":8080"
+      POD: ${APP_POD:?Run cp .env.example .env first}
+      DATACENTER: ${APP_DATACENTER:?Run cp .env.example .env first}
+      DEPLOYMENT: ${APP_DEPLOYMENT:?Run cp .env.example .env first}
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    mem_limit: 256m
+    cpus: 1.0
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     healthcheck:
       test: ["CMD", "/server", "healthcheck"]
       interval: 5s
       timeout: 3s
-      retries: 5
-      start_period: 5s
+      retries: 12
     restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
