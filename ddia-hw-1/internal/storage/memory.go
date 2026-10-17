@@ -57,7 +57,7 @@ func (m *Memory) Get(id string) (Item, error) {
 	return item, nil
 }
 
-func (m *Memory) List() []Item {
+func (m *Memory) List(limit int) []Item {
 	m.mu.RLock()
 	items := make([]Item, 0, len(m.items))
 	for _, item := range m.items {
@@ -71,6 +71,9 @@ func (m *Memory) List() []Item {
 		}
 		return strings.Compare(a.ID, b.ID)
 	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
 	return items
 }
 

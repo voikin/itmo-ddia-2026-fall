@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -52,7 +53,14 @@ func run(addr string) error {
 	gs := metrics.New(labels, reg, metrics.WithSkip("/healthz", "/metrics", "/routes"))
 	metricsHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg})
 
-	router := api.NewRouter(storage.NewMemory(), gs.Middleware, metricsHandler, api.Routes(gs.Routes))
+	faults, err := faultsFromEnv()
+	if err != nil {
+		return err
+	}
+	slog.Info("fault injection", "base_latency", faults.BaseLatency, "jitter", faults.Jitter,
+		"tail_every", faults.TailEvery, "tail_extra", faults.TailExtra, "error_every", faults.ErrorEvery)
+
+	router := api.NewRouter(storage.NewMemory(), gs.Middleware, faults.Middleware, metricsHandler, api.Routes(gs.Routes))
 	if err := gs.Init(router); err != nil {
 		return fmt.Errorf("init metrics: %w", err)
 	}
@@ -106,6 +114,51 @@ func healthcheck(addr string) error {
 		return fmt.Errorf("unhealthy: status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func faultsFromEnv() (*api.Faults, error) {
+	f := &api.Faults{}
+	var err error
+	if f.BaseLatency, err = durationEnv("FAULT_BASE_LATENCY", 0); err != nil {
+		return nil, err
+	}
+	if f.Jitter, err = durationEnv("FAULT_JITTER", 0); err != nil {
+		return nil, err
+	}
+	if f.TailExtra, err = durationEnv("FAULT_TAIL_EXTRA", 0); err != nil {
+		return nil, err
+	}
+	if f.TailEvery, err = uintEnv("FAULT_TAIL_EVERY"); err != nil {
+		return nil, err
+	}
+	if f.ErrorEvery, err = uintEnv("FAULT_ERROR_EVERY"); err != nil {
+		return nil, err
+	}
+	return f, f.Validate()
+}
+
+func durationEnv(key string, def time.Duration) (time.Duration, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return def, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", key, err)
+	}
+	return d, nil
+}
+
+func uintEnv(key string) (uint64, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return 0, nil
+	}
+	n, err := strconv.ParseUint(v, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", key, err)
+	}
+	return n, nil
 }
 
 func envOr(key, def string) string {

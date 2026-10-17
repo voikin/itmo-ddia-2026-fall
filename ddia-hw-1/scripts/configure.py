@@ -23,9 +23,11 @@ def parse(path):
 
 
 expected, values = parse(example), parse(env)
-unknown = set(values) - set(expected)
-if unknown:
-    raise SystemExit(f'Unexpected keys in .env: {sorted(unknown)}')
+obsolete = sorted(set(values) - set(expected))
+for key in obsolete:
+    del values[key]
+if obsolete:
+    print(f'Removed keys that are no longer used: {obsolete}')
 for key, default in expected.items():
     values.setdefault(key, default)
 
@@ -35,9 +37,8 @@ for key in ('GRAFANA_ADMIN_PASSWORD',):
     if not re.fullmatch(r'[0-9a-f]{32,128}', values[key]):
         raise SystemExit(f'{key}: expected 32..128 lowercase hex characters; value not printed')
 
-for key in ('APP_POD', 'APP_DATACENTER', 'APP_DEPLOYMENT'):
-    if not re.fullmatch(r'[a-zA-Z0-9_.-]{1,63}', values[key]):
-        raise SystemExit(f'{key}: expected 1..63 of [a-zA-Z0-9_.-]')
+if not re.fullmatch(r'[a-zA-Z0-9_.-]{1,63}', values['APP_DEPLOYMENT']):
+    raise SystemExit('APP_DEPLOYMENT: expected 1..63 of [a-zA-Z0-9_.-]')
 if not values['APP_PORT'].isdigit() or not 1 <= int(values['APP_PORT']) <= 65535:
     raise SystemExit('APP_PORT: expected integer 1..65535')
 

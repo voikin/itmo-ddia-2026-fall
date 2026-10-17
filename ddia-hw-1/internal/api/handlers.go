@@ -3,8 +3,10 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,7 +14,11 @@ import (
 	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/pkg/metrics"
 )
 
-const maxBodyBytes = 1 << 20
+const (
+	maxBodyBytes     = 1 << 20
+	defaultListLimit = 100
+	maxListLimit     = 1000
+)
 
 type itemRequest struct {
 	Name  string `json:"name"`
@@ -39,8 +45,17 @@ func (h *Handlers) CreateItem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, h.store.Create(req.Name, req.Value))
 }
 
-func (h *Handlers) ListItems(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, h.store.List())
+func (h *Handlers) ListItems(w http.ResponseWriter, r *http.Request) {
+	limit := defaultListLimit
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > maxListLimit {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("limit must be an integer in 1..%d", maxListLimit))
+			return
+		}
+		limit = n
+	}
+	writeJSON(w, http.StatusOK, h.store.List(limit))
 }
 
 func (h *Handlers) GetItem(w http.ResponseWriter, r *http.Request) {
