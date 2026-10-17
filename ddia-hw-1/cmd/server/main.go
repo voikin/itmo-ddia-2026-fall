@@ -49,10 +49,10 @@ func run(addr string) error {
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
-	gs := metrics.New(labels, reg, metrics.WithSkip("/healthz", "/metrics"))
+	gs := metrics.New(labels, reg, metrics.WithSkip("/healthz", "/metrics", "/routes"))
 	metricsHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg})
 
-	router := api.NewRouter(storage.NewMemory(), gs.Middleware, metricsHandler)
+	router := api.NewRouter(storage.NewMemory(), gs.Middleware, metricsHandler, api.Routes(gs.Routes))
 	if err := gs.Init(router); err != nil {
 		return fmt.Errorf("init metrics: %w", err)
 	}

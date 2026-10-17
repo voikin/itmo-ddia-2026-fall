@@ -9,7 +9,7 @@ import (
 	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/internal/storage"
 )
 
-func NewRouter(store *storage.Memory, metrics func(http.Handler) http.Handler, metricsHandler http.Handler) *chi.Mux {
+func NewRouter(store *storage.Memory, metrics func(http.Handler) http.Handler, metricsHandler, routesHandler http.Handler) *chi.Mux {
 	h := NewHandlers(store)
 
 	r := chi.NewRouter()
@@ -19,6 +19,7 @@ func NewRouter(store *storage.Memory, metrics func(http.Handler) http.Handler, m
 
 	r.Get("/healthz", Health)
 	r.Method(http.MethodGet, "/metrics", metricsHandler)
+	r.Method(http.MethodGet, "/routes", routesHandler)
 
 	r.Route("/items", func(r chi.Router) {
 		r.Post("/", h.CreateItem)

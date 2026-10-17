@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/internal/storage"
+	"github.com/voikin/itmo-ddia-2026-fall/ddia-hw-1/pkg/metrics"
 )
 
 const maxBodyBytes = 1 << 20
@@ -66,6 +67,12 @@ func (h *Handlers) UpdateItem(w http.ResponseWriter, r *http.Request) {
 
 func Health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func Routes(list func() []metrics.Route) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, list())
+	}
 }
 
 func decodeItemRequest(w http.ResponseWriter, r *http.Request) (itemRequest, bool) {
